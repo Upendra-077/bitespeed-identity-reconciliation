@@ -53,3 +53,39 @@ Rules:
   "email": "string (optional)",
   "phoneNumber": "string (optional)"
 }
+
+
+
+Expected Response (Status 200 OK)
+JSON
+{
+  "contact": {
+    "primaryContatctId": 1,
+    "emails": [
+      "doc@fluxkart.com",
+      "emmett.brown@hillvalley.edu"
+    ],
+    "phoneNumbers": [
+      "123456"
+    ],
+    "secondaryContactIds": [
+      2
+    ]
+  }
+}
+⚙️ Running Locally
+1. Clone the repository and install dependencies:
+
+Bash
+npm install
+2. Initialize the database and generate the Prisma client:
+
+Bash
+npx prisma db push
+npx prisma generate
+3. Start the development server:
+
+Bash
+npm run dev
+The server will start on http://localhost:3000.
+
