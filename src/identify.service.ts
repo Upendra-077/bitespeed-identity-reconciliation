@@ -14,7 +14,6 @@ export async function identifyContact(input: IdentifyInput) {
   }
 
   return prisma.$transaction(async (tx) => {
-    // Step 1: Find matching contacts
     const matchedContacts = await tx.contact.findMany({
       where: {
         OR: [
@@ -28,8 +27,8 @@ export async function identifyContact(input: IdentifyInput) {
     if (matchedContacts.length === 0) {
       const newContact = await tx.contact.create({
         data: {
-          email,
-          phoneNumber,
+          email: email ?? null,
+          phoneNumber: phoneNumber ?? null,
           linkPrecedence: "primary",
         },
       });
@@ -37,7 +36,7 @@ export async function identifyContact(input: IdentifyInput) {
       return formatResponse([newContact]);
     }
 
-    // Step 2: Get all related contacts
+    // Find all related primary IDs
     const contactIds = matchedContacts.map((c) =>
       c.linkPrecedence === "primary" ? c.id : c.linkedId!
     );
@@ -50,8 +49,11 @@ export async function identifyContact(input: IdentifyInput) {
     });
 
     const primary = primaryContacts[0];
+    if (!primary) {
+      throw new Error("Primary contact not found");
+    }
 
-    // Step 3: Convert other primaries to secondary if needed
+    // Convert other primaries to secondary
     for (const pc of primaryContacts.slice(1)) {
       await tx.contact.update({
         where: { id: pc.id },
@@ -62,7 +64,6 @@ export async function identifyContact(input: IdentifyInput) {
       });
     }
 
-    // Step 4: Create secondary if new info
     const emails = matchedContacts.map((c) => c.email);
     const phones = matchedContacts.map((c) => c.phoneNumber);
 
@@ -72,15 +73,14 @@ export async function identifyContact(input: IdentifyInput) {
     ) {
       await tx.contact.create({
         data: {
-          email,
-          phoneNumber,
+          email: email ?? null,
+          phoneNumber: phoneNumber ?? null,
           linkPrecedence: "secondary",
           linkedId: primary.id,
         },
       });
     }
 
-    // Step 5: Fetch all linked contacts
     const allContacts = await tx.contact.findMany({
       where: {
         OR: [{ id: primary.id }, { linkedId: primary.id }],
@@ -93,6 +93,10 @@ export async function identifyContact(input: IdentifyInput) {
 
 function formatResponse(contacts: any[]) {
   const primary = contacts.find((c) => c.linkPrecedence === "primary");
+
+  if (!primary) {
+    throw new Error("Primary contact missing");
+  }
 
   const uniqueEmails = Array.from(
     new Set(contacts.map((c) => c.email).filter(Boolean))
